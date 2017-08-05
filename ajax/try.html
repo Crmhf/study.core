@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-cmn-Hans">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模拟ajax调用的示例</title>
+    <script type="text/javascript" src="config/"></script>
+    <!-- 暂时使用jQuery的ajax请求-->
+    <script type="text/javascript" src="3rd/jquery/2.1.1/jquery.js"></script>
+    <script type="text/javascript" src="js/ajaxPlus.js"></script>
+</head>
+<body>
+<!-- 注释模块 -->
+<div class="m-topic g-mod">
+    页面
+</div>
+<!-- /注释模块 -->
+</body>
+</html>
+
+<script>
+// 以新增一个地图文档为例
+// 获取到地图的中心点及缩放级别
+var _getMapCenter = function(){
+		// 获取到地图的中心位置及缩放的级别
+		mapInfo.center = getMapZoom();
+	},
+	// 地图新增成功后的操作
+    _success = function(result){
+		alert('地图新增完毕！');
+		var id = result.data;
+		// 新增玩应用后需要刷新页面,记录下appid
+		setTimeout(function() {
+			window.location.href = URL.getHost() + "index.html?appid=" + id;
+		}, 1000);
+	},
+	// ajax请求，不同类的框架中可以复用的位置
+	_sendRequest = function(){
+		// 获取服务地址
+		var requestURL = commonConfig.app.add;
+		// 提交的数据一定要先格式化
+		var appName = $("#input-viz-name").val(); // 标题
+		var appDesc = $("#text-viz-desc").val(); // 描述
+		// 生成存储应用扩展表的id,预先在客户端生成
+		var appExId = uuid();
+
+		var data=JSON.stringify(mapInfo);
+		var typeid = '50001',
+			url = URL.getHref() + '?appid=' + appExId, // 保存的是地图中的应用的
+			sourceuri = url,
+			thumburi = '',
+			createrid = userinfo.USEROID,
+			catalogid = _catalogid,
+			author = userinfo.PERSONNAME,
+			version = '1.0',
+			owner = '2';
+
+		var dataAddPost = JSON.stringify({
+			"resource": {
+				"name": appName,
+				"typeid": typeid,
+				"thumburi": thumburi,
+				"url": url, // 服务访问地址，后端自动生成
+				"sourceuri": sourceuri,  // 资源的实际地址
+				"publishid": appExId, // 引用和共享的时候用
+				"createrid": createrid,
+				//"updaterid": null,// 更新者id
+				"catalogid": catalogid, // 目录id
+				"servicestatus": 0, // 服务状态,默认未发布成服务，现在没有发布成服务的功能；
+				"regstatus": 0,  // 注册状态，现在默认为未注册
+				"downloadtimes": 0, // 下载次数
+				"visittimes": 0, // 访问次数
+				"tag": "", // 资源表中的tag
+				"author": author, // 作者，默认读取的是登录的用户名称
+				"version": version, // 默认的工具版本
+				// "storesize": 30, // 资源大小
+				"grade": 5.0, // 默认评分
+				"owner": owner,
+				"description": appDesc
+			},
+			"resourceExtend":{
+				"info":data,
+				"data":"mapViewer"
+
+			},
+			"tagid": ""
+		});
+
+		// 服务的使用
+		jsonAjax(requestURL, dataAddPost, _success);
+
+	};
+    (function () {
+	// _checkLogin();
+	_getMapCenter();
+	// 检查目录的id是否重复
+	var x = checkImport(_catalogid);
+	if(x===true){
+		// 所有业务系统中可以复用的部分
+		_sendRequest();
+	}
+})();
+</script>
+
+<script>
+    // use in angular js
+	function loginFunction(data){
+		console.log(ServiceConfig.user.login);
+		console.log(data);
+		$http({
+			method: 'POST',
+			url: ServiceConfig.user.login,
+			data: data
+		}).success(function (resultData, status, headers) {
+
+			//$window.location.reload();
+			if ('200' == resultData.statusCode) {
+				//  var userJur=result.BUSINESSLIST;
+				//   isInList(userJur);
+
+				var userinfo = {
+					USEROID:resultData.data.id
+				};
+                /*  if(true==$scope.keyRight){
+                 userinfo.keyRight=$scope.keyRight;
+                 }*/
+				//userinfo.USEROID = result.USEROID;//令牌ID
+				userinfo.ORGANIZEOID = resultData.data.orgid;//组织机构
+				// userinfo.POST = result.data.posts;//岗位
+				userinfo.ORGPARENTOID = resultData.data.orgparentid;//组织机构父ID
+				userinfo.ORGPARENTROOTOID = resultData.data.orgrootid;//组织机构根ID
+				userinfo.PERSONNAME = resultData.data.truename;
+				userinfo.ORGNAME = resultData.data.orgname;
+				//  userinfo.BUSINESSLIST=result.BUSINESSLIST;
+				if(!resultData.data.photouri){
+					resultData.data.photouri="img/index/map/head-image.png";
+				}else{
+					userinfo.photouri =  resultData.data.photouri; // 用户图片的绝对地址
+				}
+				//userinfo.PHOTOURL = SERVER_AUTHORITY_URL + result.PHOTOURL; // 用户图片的绝对地址
+				// userinfo.PHOTOURL = 'http://192.168.1.75:8080/user-center/upload/userinfo/36d09ed1-373b-49ab-9663-a6053c91e9cb.jpg'; // 用户图片的绝对地址
+				userinfo.USERFLAG = resultData.data.permtype; // 0 超级管理员 1 组织管理员 2 普通用户
+				userinfo.TOKEN = headers("TOKEN");
+				//getUserConfine(userinfo.TOKEN);
+				//	userinfo.Root = "http://192.168.1.142/frame/";//ktw.cookie.getRootPath();
+				$cookieStore.put('userinfo',userinfo);
+
+				$location.path('/');
+
+
+			}
+			else if('30001' == resultData.statusCode){
+				toaster.pop('info', "提示", resultData.message, 'toast-center-center');
+				$timeout(toaster.close, 3000);
+				return;
+			}
+			else if('21801' == resultData.statusCode){
+				toaster.pop('info', "提示",resultData.message, 'toast-center-center');
+				$timeout(toaster.close, 3000);
+				return;
+			}
+			else {
+				toaster.pop('info', "提示","服务连接失败...", 'toast-center-center');
+				$timeout(toaster.close, 3000);
+			}
+		}).error(function () {
+
+			toaster.pop('info', "提示","服务连接失败...", 'toast-center-center');
+			$timeout(toaster.close, 3000);
+		});
+
+	}
+</script>
+
+<script>
+    // use in vue js
+	let data = {
+		appExEntity: {
+			path: '',
+			data: '',
+			info : JSON.stringify(state) //我的方案内容string json
+		},
+		infoEntity: {
+			catalogId: '',//目录ID,这里不传，由后台根据组织id匹配,
+			userId: Cookies.get('id'),
+			orgId: Cookies.set('orgid'),
+
+			name: this.schameName,
+			typeId: '40031', //
+			thumbUri: 'http://192.168.1.92/static/img/dvz.d9ecc10.png',
+			tag: '',
+			description: ''
+		}
+	};
+	let uri = this.ServiceConfig.could.appAdd
+	if(this.$route.params.id !== 'n') {
+		data.infoEntity['id'] = this.$route.params.id
+		uri = this.ServiceConfig.could.update
+	};
+	new Model(this.ServiceConfig.could).post({
+		uri: uri,
+		data: data
+	}).then(function(res){
+
+		if(200 === res.data.statusCode){
+			this.$Message.success('保存成功！')
+		}else {
+			this.$Message.error(res.message)
+		}
+
+	}.bind(this))
+		.catch((ex) => {
+		this.$Message.error(ex.message)
+	});
+</script>
